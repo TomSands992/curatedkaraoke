@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Karaokelista</title>
-    <script src="https://cloudflare.com"></script>
+    <!-- Vi laddar List.js och ser till att den läser av sökfältet direkt -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/list.js/2.3.1/list.min.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
         .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         h1 { text-align: center; margin-bottom: 20px; font-size: 24px; color: #111; }
         .search { width: 100%; padding: 12px; margin-bottom: 20px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; outline: none; transition: border-color 0.2s; }
@@ -22,7 +23,8 @@
 <div class="container" id="karaoke-box">
     <h1>🎤 Karaokelistan</h1>
     
-    <input class="search" placeholder="Sök på artist eller låttitel..." />
+    <!-- Id "search-field" säkrar att List.js lyssnar på exakt detta fält -->
+    <input id="search-field" class="search" placeholder="Sök på artist eller låttitel..." />
 
     <table>
         <thead>
@@ -32,7 +34,7 @@
             </tr>
         </thead>
         <tbody class="list" id="table-body">
-            <!-- Låtarna laddas in här dynamiskt -->
+            <!-- Låtarna byggs upp här -->
         </tbody>
     </table>
     
@@ -40,35 +42,59 @@
 </div>
 
 <script>
+    // 1. Skapa söklistan tom först
+    var karaokeList = new List('karaoke-box', {
+        valueNames: ['title', 'artist'],
+        searchDelay: 100 // Förhindrar lagg vid väldigt stora listor
+    });
+
+    // 2. Hämta datan från songs.json
     fetch('songs.json')
         .then(response => response.json())
         .then(data => {
             const tableBody = document.getElementById('table-body');
             
             data.forEach(song => {
+                // Den här logiken rensar bort felaktiga fältnamn (t.ex. om det står "Artist" eller "Låttitel")
+                let rawTitle = song.title || song.Title || song.Låttitel || song.låttitel || song.Låt || song.låt || "";
+                let rawArtist = song.artist || song.Artist || song.Grupp || song.grupp || "";
+
+                // Skapa HTML-raden manuellt
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td class="title">${song.title}</td>
-                    <td class="artist">${song.artist}</td>
+                    <td class="title">${rawTitle}</td>
+                    <td class="artist">${rawArtist}</td>
                 `;
                 tableBody.appendChild(row);
+
+                // Tryck in datan i List.js sökindex samtidigt
+                karaokeList.add({
+                    title: rawTitle,
+                    artist: rawArtist
+                });
             });
 
-            var options = {
-                valueNames: ['title', 'artist']
-            };
-            var karaokeList = new List('karaoke-box', options);
-
-            karaokeList.on('updated', function(list) {
-                const emptyMessage = document.getElementById('empty-message');
-                if (list.matchingItems.length === 0) {
-                    emptyMessage.style.display = 'block';
-                } else {
-                    emptyMessage.style.display = 'none';
-                }
-            });
+            // Sortera listan alfabetiskt efter titel när den startar
+            karaokeList.sort('title', { order: 'asc' });
         })
-        .catch(error => console.error('Kunde inte ladda låtlistan:', error));
+        .catch(error => {
+            console.error('Kunde inte läsa songs.json. Är filen sparad med korrekt JSON-format?', error);
+        });
+
+    // 3. Koppla sökfältet manuellt för att garantera att det fungerar
+    document.getElementById('search-field').addEventListener('input', function(e) {
+        karaokeList.search(e.target.value);
+    });
+
+    // Visa/dölj meddelande om sökningen är tom
+    karaokeList.on('updated', function(list) {
+        const emptyMessage = document.getElementById('empty-message');
+        if (list.matchingItems.length === 0) {
+            emptyMessage.style.display = 'block';
+        } else {
+            emptyMessage.style.display = 'none';
+        }
+    });
 </script>
 
 </body>
