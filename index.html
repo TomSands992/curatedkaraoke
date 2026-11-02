@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Karaokelista</title>
-    <script src="https://cloudflare.com"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
         .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
@@ -20,22 +19,23 @@
 </head>
 <body>
 
-<div class="container" id="karaoke-box">
+<div class="container">
     <h1>🎤 Karaokelistan</h1>
     
     <div id="error-message" class="error-box"></div>
     
-    <input class="search" placeholder="Sök på artist eller låttitel..." />
+    <!-- Vårt nya inbyggda sökfält -->
+    <input id="search-input" class="search" placeholder="Sök på artist eller låttitel..." />
 
     <table>
         <thead>
             <tr>
-                <th class="sort" data-sort="title">Låttitel</th>
-                <th class="sort" data-sort="artist">Artist</th>
+                <th>Låttitel</th>
+                <th>Artist</th>
             </tr>
         </thead>
-        <tbody class="list" id="table-body">
-            <!-- Låtarna byggs upp här INNAN sökfunktionen startar -->
+        <tbody id="table-body">
+            <!-- Låtarna byggs upp här -->
         </tbody>
     </table>
     
@@ -44,52 +44,55 @@
 
 <script>
     const errorBox = document.getElementById('error-message');
+    const tableBody = document.getElementById('table-body');
+    const searchInput = document.getElementById('search-input');
+    const emptyMessage = document.getElementById('empty-message');
+    
+    let allSongs = []; // Här sparar vi alla låtar i minnet
+
     function showError(title, details) {
         errorBox.style.display = 'block';
         errorBox.innerHTML = `<strong>${title}</strong><br>${details}`;
     }
 
-    // 1. Hämta datan först från songs.json
+    // 1. Rendera ut låtarna i tabellen
+    function renderTable(songsToDisplay) {
+        tableBody.innerHTML = '';
+        
+        if (songsToDisplay.length === 0) {
+            emptyMessage.style.display = 'block';
+            return;
+        }
+        emptyMessage.style.display = 'none';
+
+        songsToDisplay.forEach(song => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${song.title}</td>
+                <td>${song.artist}</td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+
+    // 2. Hämta datan från songs.json
     fetch('songs.json')
         .then(response => {
-            if (!response.ok) {
-                throw new Error(`Kunde inte hitta <code>songs.json</code>. Kontrollera filnamnet.`);
-            }
+            if (!response.ok) throw new Error(`Hittade inte <code>songs.json</code>.`);
             return response.json();
         })
         .then(data => {
-            const tableBody = document.getElementById('table-body');
-            
-            // 2. Skapa vanliga HTML-rader i tabellen för varje låt
-            data.forEach(song => {
-                let rawTitle = song.title || song.Title || song.Låttitel || song.låttitel || song.Låt || "";
-                let rawArtist = song.artist || song.Artist || song.Grupp || "";
+            // Standardisera fältnamnen oavsett om de har stora eller små bokstäver
+            allSongs = data.map(song => ({
+                title: song.title || song.Title || song.Låttitel || song.låttitel || song.Låt || "",
+                artist: song.artist || song.Artist || song.Grupp || ""
+            }));
 
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="title">${rawTitle}</td>
-                    <td class="artist">${rawArtist}</td>
-                `;
-                tableBody.appendChild(row);
-            });
+            // Sortera alfabetiskt efter låttitel som standard
+            allSongs.sort((a, b) => a.title.localeCompare(b.title, 'sv'));
 
-            // 3. Starta List.js FÖRST NU när alla rader faktiskt finns i tabellen
-            var karaokeList = new List('karaoke-box', {
-                valueNames: ['title', 'artist']
-            });
-
-            // Sortera listan alfabetiskt efter låttitel som standard
-            karaokeList.sort('title', { order: 'asc' });
-
-            // Visa meddelande om sökningen blir tom
-            karaokeList.on('updated', function(list) {
-                const emptyMessage = document.getElementById('empty-message');
-                if (list.matchingItems.length === 0) {
-                    emptyMessage.style.display = 'block';
-                } else {
-                    emptyMessage.style.display = 'none';
-                }
-            });
+            // Visa listan på skärmen
+            renderTable(allSongs);
         })
         .catch(error => {
             if (error.name === "SyntaxError") {
@@ -98,6 +101,19 @@
                 showError("Ett fel uppstod:", error.message);
             }
         });
+
+    // 3. Den inbyggda sökfunktionen (Helt oberoende av externa skript!)
+    searchInput.addEventListener('input', function(e) {
+        const searchTerm = e.target.value.toLowerCase().trim();
+        
+        // Filtrera listan baserat på vad användaren skriver
+        const filteredSongs = allSongs.filter(song => {
+            return song.title.toLowerCase().includes(searchTerm) || 
+                   song.artist.toLowerCase().includes(searchTerm);
+        });
+        
+        renderTable(filteredSongs);
+    });
 </script>
 
 </body>
