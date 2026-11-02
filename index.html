@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karaokelista</title>
+    <script src="https://cloudflare.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        h1 { text-align: center; margin-bottom: 20px; font-size: 24px; color: #111; }
+        .search { width: 100%; padding: 12px; margin-bottom: 20px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; outline: none; transition: border-color 0.2s; }
+        .search:focus { border-color: #007aff; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #fafafa; cursor: pointer; user-select: none; font-weight: 600; }
+        .no-result { display: none; text-align: center; padding: 20px; color: #666; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="karaoke-box">
+    <h1>🎤 Karaokelistan</h1>
+    
+    <input class="search" placeholder="Sök på artist eller låttitel..." />
+
+    <table>
+        <thead>
+            <tr>
+                <th class="sort" data-sort="title">Låttitel</th>
+                <th class="sort" data-sort="artist">Artist</th>
+            </tr>
+        </thead>
+        <tbody class="list" id="table-body">
+            <!-- Låtarna laddas in här dynamiskt -->
+        </tbody>
+    </table>
+    
+    <div class="no-result" id="empty-message">Inga låtar matchar din sökning.</div>
+</div>
+
+<script>
+    fetch('songs.json')
+        .then(response => response.json())
+        .then(data => {
+            const tableBody = document.getElementById('table-body');
+            
+            data.forEach(song => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="title">${song.title}</td>
+                    <td class="artist">${song.artist}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+            var options = {
+                valueNames: ['title', 'artist']
+            };
+            var karaokeList = new List('karaoke-box', options);
+
+            karaokeList.on('updated', function(list) {
+                const emptyMessage = document.getElementById('empty-message');
+                if (list.matchingItems.length === 0) {
+                    emptyMessage.style.display = 'block';
+                } else {
+                    emptyMessage.style.display = 'none';
+                }
+            });
+        })
+        .catch(error => console.error('Kunde inte ladda låtlistan:', error));
+</script>
+
+</body>
+</html>
