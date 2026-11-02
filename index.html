@@ -8,11 +8,24 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
         .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         h1 { text-align: center; margin-bottom: 20px; font-size: 24px; color: #111; }
-        .search { width: 100%; padding: 12px; margin-bottom: 20px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; outline: none; transition: border-color 0.2s; }
+        .search { width: 100%; padding: 12px; margin-bottom: 15px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; outline: none; transition: border-color 0.2s; }
         .search:focus { border-color: #007aff; }
+        
+        /* Alfabetisk snabbmeny */
+        .alphabet-menu { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-bottom: 20px; padding: 10px; background: #fafafa; border-radius: 8px; border: 1px solid #eee; }
+        .alphabet-menu button { background: white; border: 1px solid #ddd; border-radius: 4px; padding: 6px 10px; font-size: 14px; font-weight: bold; cursor: pointer; color: #007aff; user-select: none; }
+        .alphabet-menu button:hover { background: #007aff; color: white; border-color: #007aff; }
+        .alphabet-menu button:disabled { background: #eee; color: #aaa; border-color: #ddd; cursor: not-allowed; }
+        .alphabet-menu button.active { background: #34c759; color: white; border-color: #34c759; }
+
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background-color: #fafafa; cursor: pointer; font-weight: 600; user-select: none; }
+        
+        /* Klickbara rubriker med pilar */
+        th { background-color: #fafafa; cursor: pointer; font-weight: 600; user-select: none; position: relative; }
+        th.sort-asc::after { content: ' ↑'; color: #007aff; }
+        th.sort-desc::after { content: ' ↓'; color: #007aff; }
+        
         .error-box { display: none; background-color: #ffeef0; border: 1px solid #ffccd3; color: #d9383a; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; }
         .no-result { display: none; text-align: center; padding: 20px; color: #666; }
     </style>
@@ -24,18 +37,20 @@
     
     <div id="error-message" class="error-box"></div>
     
-    <!-- Vårt nya inbyggda sökfält -->
     <input id="search-input" class="search" placeholder="Sök på artist eller låttitel..." />
+
+    <!-- Bokstavsmenyn skapas dynamiskt här -->
+    <div id="alphabet-menu" class="alphabet-menu"></div>
 
     <table>
         <thead>
             <tr>
-                <th>Låttitel</th>
-                <th>Artist</th>
+                <th id="th-title" class="sort-asc">Låttitel</th>
+                <th id="th-artist">Artist</th>
             </tr>
         </thead>
         <tbody id="table-body">
-            <!-- Låtarna byggs upp här -->
+            <!-- Låtarna laddas in här -->
         </tbody>
     </table>
     
@@ -47,15 +62,21 @@
     const tableBody = document.getElementById('table-body');
     const searchInput = document.getElementById('search-input');
     const emptyMessage = document.getElementById('empty-message');
+    const alphabetMenu = document.getElementById('alphabet-menu');
+    const thTitle = document.getElementById('th-title');
+    const thArtist = document.getElementById('th-artist');
     
-    let allSongs = []; // Här sparar vi alla låtar i minnet
+    let allSongs = []; 
+    let currentSongs = []; // Den lista som visas just nu (efter sökning/filtrering)
+    let currentSort = { column: 'title', asc: true }; // Håller koll på aktiv sortering
+    let activeLetter = null; // Håller koll på om en bokstav är vald
 
     function showError(title, details) {
         errorBox.style.display = 'block';
         errorBox.innerHTML = `<strong>${title}</strong><br>${details}`;
     }
 
-    // 1. Rendera ut låtarna i tabellen
+    // 1. Rendera ut listan i tabellen
     function renderTable(songsToDisplay) {
         tableBody.innerHTML = '';
         
@@ -75,24 +96,140 @@
         });
     }
 
-    // 2. Hämta datan från songs.json
+    // 2. Sorteringsmotor
+    function sortList(column) {
+        // Om man klickar på samma kolumn igen, vänd på ordningen. Annars sätt till stigande (A-Ö).
+        if (currentSort.column === column) {
+            currentSort.asc = !currentSort.asc;
+        } else {
+            currentSort.column = column;
+            currentSort.asc = true;
+        }
+
+        // Uppdatera pilarna i rubrikerna
+        thTitle.className = '';
+        thArtist.className = '';
+        const targetTh = column === 'title' ? thTitle : thArtist;
+        targetTh.className = currentSort.asc ? 'sort-asc' : 'sort-desc';
+
+        // Sortera den aktiva vyn
+        currentSongs.sort((a, b) => {
+            const valA = a[column].toLowerCase();
+            const valB = b[column].toLowerCase();
+            return currentSort.asc ? valA.localeCompare(valB, 'sv') : valB.localeCompare(valA, 'sv');
+        });
+
+        renderTable(currentSongs);
+    }
+
+    // Klicklyssnare för tabellrubrikerna
+    thTitle.addEventListener('click', () => sortList('title'));
+    thArtist.addEventListener('click', () => sortList('artist'));
+
+    // 3. Bygg A-Ö menyn dynamiskt baserat på vad som finns i listan
+    function buildAlphabetMenu() {
+        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZÅÄÖ".split("");
+        
+        // Hitta vilka bokstäver som faktiskt har låtar (viktigt baserat på vald sorteringskolumn)
+        const existingLetters = new Set(allSongs.map(song => {
+            const trackString = song[currentSort.column];
+            return trackString ? trackString.charAt(0).toUpperCase() : "";
+        }));
+
+        alphabetMenu.innerHTML = '';
+        
+        // Skapa en "Visa alla"-knapp
+        const allBtn = document.createElement('button');
+        allBtn.textContent = "ALLA";
+        if (!activeLetter) allBtn.className = 'active';
+        allBtn.addEventListener('click', () => {
+            activeLetter = null;
+            searchInput.value = '';
+            filterAndSearch();
+        });
+        alphabetMenu.appendChild(allBtn);
+
+        // Skapa knappar för varje bokstav
+        alphabet.forEach(letter => {
+            const btn = document.createElement('button');
+            btn.textContent = letter;
+            
+            // Inaktivera knappen om det inte finns några låtar på den bokstaven
+            if (!existingLetters.has(letter)) {
+                btn.disabled = true;
+            }
+
+            if (activeLetter === letter) btn.className = 'active';
+
+            btn.addEventListener('click', () => {
+                searchInput.value = ''; // Rensa sökfältet när man trycker på en bokstav
+                if (activeLetter === letter) {
+                    activeLetter = null; // Klicka igen för att avmarkera
+                } else {
+                    activeLetter = letter;
+                }
+                filterAndSearch();
+            });
+            alphabetMenu.appendChild(btn);
+        });
+    }
+
+    // 4. Kombinerad sök- och bokstavsfiltrering
+    function filterAndSearch() {
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        
+        currentSongs = allSongs.filter(song => {
+            // Kolla bokstavsfiltrering (kollar den kolumn som är aktivt sorterad just nu)
+            if (activeLetter) {
+                const targetValue = song[currentSort.column];
+                if (!targetValue || targetValue.charAt(0).toUpperCase() !== activeLetter) {
+                    return false;
+                }
+            }
+            // Kolla sökfält
+            if (searchTerm) {
+                return song.title.toLowerCase().includes(searchTerm) || 
+                       song.artist.toLowerCase().includes(searchTerm);
+            }
+            return true;
+        });
+
+        // Håll kvar sorteringsordningen
+        const col = currentSort.column;
+        currentSongs.sort((a, b) => {
+            const valA = a[col].toLowerCase();
+            const valB = b[col].toLowerCase();
+            return currentSort.asc ? valA.localeCompare(valB, 'sv') : valB.localeCompare(valA, 'sv');
+        });
+
+        buildAlphabetMenu(); // Bygg om menyn så aktiva knappar lyser rätt
+        renderTable(currentSongs);
+    }
+
+    // Lyssna på sökfältet
+    searchInput.addEventListener('input', () => {
+        activeLetter = null; // Nollställ bokstavsval om man börjar skriva i fritextsöket
+        filterAndSearch();
+    });
+
+    // 5. Hämta datan från songs.json när sidan startar
     fetch('songs.json')
         .then(response => {
             if (!response.ok) throw new Error(`Hittade inte <code>songs.json</code>.`);
             return response.json();
         })
         .then(data => {
-            // Standardisera fältnamnen oavsett om de har stora eller små bokstäver
             allSongs = data.map(song => ({
-                title: song.title || song.Title || song.Låttitel || song.låttitel || song.Låt || "",
-                artist: song.artist || song.Artist || song.Grupp || ""
+                title: (song.title || song.Title || song.Låttitel || song.låttitel || song.Låt || "").trim(),
+                artist: (song.artist || song.Artist || song.Grupp || "").trim()
             }));
 
-            // Sortera alfabetiskt efter låttitel som standard
+            // Första standardsortering (Låttitel A-Ö)
             allSongs.sort((a, b) => a.title.localeCompare(b.title, 'sv'));
+            currentSongs = [...allSongs];
 
-            // Visa listan på skärmen
-            renderTable(allSongs);
+            buildAlphabetMenu();
+            renderTable(currentSongs);
         })
         .catch(error => {
             if (error.name === "SyntaxError") {
@@ -101,19 +238,6 @@
                 showError("Ett fel uppstod:", error.message);
             }
         });
-
-    // 3. Den inbyggda sökfunktionen (Helt oberoende av externa skript!)
-    searchInput.addEventListener('input', function(e) {
-        const searchTerm = e.target.value.toLowerCase().trim();
-        
-        // Filtrera listan baserat på vad användaren skriver
-        const filteredSongs = allSongs.filter(song => {
-            return song.title.toLowerCase().includes(searchTerm) || 
-                   song.artist.toLowerCase().includes(searchTerm);
-        });
-        
-        renderTable(filteredSongs);
-    });
 </script>
 
 </body>
