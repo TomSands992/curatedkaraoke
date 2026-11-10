@@ -43,7 +43,6 @@
     
     <input id="search-input" class="search" placeholder="Sök på artist eller låttitel..." />
 
-    <!-- Bokstavsmenyn + Top 100 skapas här -->
     <div id="alphabet-menu" class="alphabet-menu"></div>
 
     <table>
@@ -74,7 +73,7 @@
     let currentSongs = []; 
     let currentSort = { column: 'title', asc: true }; 
     let activeLetter = null; 
-    let activeCollection = null; // Håller koll på om "Top 100" är valt
+    let activeCollection = null; 
 
     function showError(title, details) {
         errorBox.style.display = 'block';
@@ -121,7 +120,6 @@
     thTitle.addEventListener('click', () => sortList('title'));
     thArtist.addEventListener('click', () => sortList('artist'));
 
-    // Bygg menyn med ALLA, A-Ö och TOP 100
     function buildAlphabetMenu() {
         const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZÅÄÖ".split("");
         
@@ -132,7 +130,6 @@
 
         alphabetMenu.innerHTML = '';
         
-        // 1. ALLA-knapp
         const allBtn = document.createElement('button');
         allBtn.textContent = "ALLA";
         if (!activeLetter && !activeCollection) allBtn.className = 'active';
@@ -144,7 +141,6 @@
         });
         alphabetMenu.appendChild(allBtn);
 
-        // 2. A-Ö knappar
         alphabet.forEach(letter => {
             const btn = document.createElement('button');
             btn.textContent = letter;
@@ -153,26 +149,24 @@
 
             btn.addEventListener('click', () => {
                 searchInput.value = '';
-                activeCollection = null; // Slå av Top 100 om man väljer en bokstav
+                activeCollection = null; 
                 activeLetter = activeLetter === letter ? null : letter;
                 filterAndSearch();
             });
             alphabetMenu.appendChild(btn);
         });
 
-        // 3. TOP 100-knapp (Sist i raden)
         const topBtn = document.createElement('button');
         topBtn.textContent = "⭐ TOP 100";
         topBtn.className = 'top100-btn';
         if (activeCollection === "Top 100") topBtn.className += ' active';
         
-        // Kolla om det ens finns några Top 100-låtar i JSON
         const hasTop100 = allSongs.some(song => song.collection === "Top 100");
         if (!hasTop100) topBtn.disabled = true;
 
         topBtn.addEventListener('click', () => {
             searchInput.value = '';
-            activeLetter = null; // Slå av bokstavsfilter om man väljer Top 100
+            activeLetter = null; 
             activeCollection = activeCollection === "Top 100" ? null : "Top 100";
             filterAndSearch();
         });
@@ -183,16 +177,13 @@
         const searchTerm = searchInput.value.toLowerCase().trim();
         
         currentSongs = allSongs.filter(song => {
-            // Filtrera på samling (Top 100)
             if (activeCollection) {
                 if (song.collection !== activeCollection) return false;
             }
-            // Filtrera på bokstav
             if (activeLetter) {
                 const targetValue = song[currentSort.column];
                 if (!targetValue || targetValue.charAt(0).toUpperCase() !== activeLetter) return false;
             }
-            // Filtrera på sökord
             if (searchTerm) {
                 return song.title.toLowerCase().includes(searchTerm) || 
                        song.artist.toLowerCase().includes(searchTerm);
@@ -213,7 +204,7 @@
 
     searchInput.addEventListener('input', () => {
         activeLetter = null;
-        activeCollection = null; // Nollställ filter när man söker fritt
+        activeCollection = null; 
         filterAndSearch();
     });
 
@@ -223,11 +214,17 @@
             return response.json();
         })
         .then(data => {
-            allSongs = data.map(song => ({
-                title: (song.title || song.Title || song.Låttitel || "").trim(),
-                artist: (song.artist || song.Artist || song.Grupp || "").trim(),
-                collection: (song.collection || song.Collection || "").trim() // Läser in nya fältet
-            }));
+            // Säkrad inläsning som hanterar tomma fält utan att krascha
+            allSongs = data.map(song => {
+                const t = song.title || song.Title || song.Låttitel || "";
+                const a = song.artist || song.Artist || song.Grupp || "";
+                const c = song.collection || song.Collection || "";
+                return {
+                    title: String(t).trim(),
+                    artist: String(a).trim(),
+                    collection: String(c).trim()
+                };
+            });
 
             allSongs.sort((a, b) => a.title.localeCompare(b.title, 'sv'));
             currentSongs = [...allSongs];
@@ -236,5 +233,9 @@
             renderTable(currentSongs);
         })
         .catch(error => {
-            showError("Ett fel uppstod:", error.message);
+            showError("Ett fel uppstod vid laddning av listan:", error.message);
         });
+</script>
+
+</body>
+</html>
