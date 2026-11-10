@@ -17,11 +17,15 @@
         .alphabet-menu button:hover { background: #007aff; color: white; border-color: #007aff; }
         .alphabet-menu button:disabled { background: #eee; color: #aaa; border-color: #ddd; cursor: not-allowed; }
         .alphabet-menu button.active { background: #34c759; color: white; border-color: #34c759; }
+        
+        /* Särskild stil för Top 100-knappen */
+        .alphabet-menu button.top100-btn { color: #ff9500; border-color: #ff9500; }
+        .alphabet-menu button.top100-btn:hover { background: #ff9500; color: white; }
+        .alphabet-menu button.top100-btn.active { background: #ff9500; color: white; border-color: #ff9500; }
 
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
         
-        /* Klickbara rubriker med pilar */
         th { background-color: #fafafa; cursor: pointer; font-weight: 600; user-select: none; position: relative; }
         th.sort-asc::after { content: ' ↑'; color: #007aff; }
         th.sort-desc::after { content: ' ↓'; color: #007aff; }
@@ -39,7 +43,7 @@
     
     <input id="search-input" class="search" placeholder="Sök på artist eller låttitel..." />
 
-    <!-- Bokstavsmenyn skapas dynamiskt här -->
+    <!-- Bokstavsmenyn + Top 100 skapas här -->
     <div id="alphabet-menu" class="alphabet-menu"></div>
 
     <table>
@@ -67,19 +71,18 @@
     const thArtist = document.getElementById('th-artist');
     
     let allSongs = []; 
-    let currentSongs = []; // Den lista som visas just nu (efter sökning/filtrering)
-    let currentSort = { column: 'title', asc: true }; // Håller koll på aktiv sortering
-    let activeLetter = null; // Håller koll på om en bokstav är vald
+    let currentSongs = []; 
+    let currentSort = { column: 'title', asc: true }; 
+    let activeLetter = null; 
+    let activeCollection = null; // Håller koll på om "Top 100" är valt
 
     function showError(title, details) {
         errorBox.style.display = 'block';
         errorBox.innerHTML = `<strong>${title}</strong><br>${details}`;
     }
 
-    // 1. Rendera ut listan i tabellen
     function renderTable(songsToDisplay) {
         tableBody.innerHTML = '';
-        
         if (songsToDisplay.length === 0) {
             emptyMessage.style.display = 'block';
             return;
@@ -88,17 +91,12 @@
 
         songsToDisplay.forEach(song => {
             const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${song.title}</td>
-                <td>${song.artist}</td>
-            `;
+            row.innerHTML = `<td>${song.title}</td><td>${song.artist}</td>`;
             tableBody.appendChild(row);
         });
     }
 
-    // 2. Sorteringsmotor
     function sortList(column) {
-        // Om man klickar på samma kolumn igen, vänd på ordningen. Annars sätt till stigande (A-Ö).
         if (currentSort.column === column) {
             currentSort.asc = !currentSort.asc;
         } else {
@@ -106,13 +104,11 @@
             currentSort.asc = true;
         }
 
-        // Uppdatera pilarna i rubrikerna
         thTitle.className = '';
         thArtist.className = '';
         const targetTh = column === 'title' ? thTitle : thArtist;
         targetTh.className = currentSort.asc ? 'sort-asc' : 'sort-desc';
 
-        // Sortera den aktiva vyn
         currentSongs.sort((a, b) => {
             const valA = a[column].toLowerCase();
             const valB = b[column].toLowerCase();
@@ -122,15 +118,13 @@
         renderTable(currentSongs);
     }
 
-    // Klicklyssnare för tabellrubrikerna
     thTitle.addEventListener('click', () => sortList('title'));
     thArtist.addEventListener('click', () => sortList('artist'));
 
-    // 3. Bygg A-Ö menyn dynamiskt baserat på vad som finns i listan
+    // Bygg menyn med ALLA, A-Ö och TOP 100
     function buildAlphabetMenu() {
         const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZÅÄÖ".split("");
         
-        // Hitta vilka bokstäver som faktiskt har låtar (viktigt baserat på vald sorteringskolumn)
         const existingLetters = new Set(allSongs.map(song => {
             const trackString = song[currentSort.column];
             return trackString ? trackString.charAt(0).toUpperCase() : "";
@@ -138,55 +132,67 @@
 
         alphabetMenu.innerHTML = '';
         
-        // Skapa en "Visa alla"-knapp
+        // 1. ALLA-knapp
         const allBtn = document.createElement('button');
         allBtn.textContent = "ALLA";
-        if (!activeLetter) allBtn.className = 'active';
+        if (!activeLetter && !activeCollection) allBtn.className = 'active';
         allBtn.addEventListener('click', () => {
             activeLetter = null;
+            activeCollection = null;
             searchInput.value = '';
             filterAndSearch();
         });
         alphabetMenu.appendChild(allBtn);
 
-        // Skapa knappar för varje bokstav
+        // 2. A-Ö knappar
         alphabet.forEach(letter => {
             const btn = document.createElement('button');
             btn.textContent = letter;
-            
-            // Inaktivera knappen om det inte finns några låtar på den bokstaven
-            if (!existingLetters.has(letter)) {
-                btn.disabled = true;
-            }
-
+            if (!existingLetters.has(letter)) btn.disabled = true;
             if (activeLetter === letter) btn.className = 'active';
 
             btn.addEventListener('click', () => {
-                searchInput.value = ''; // Rensa sökfältet när man trycker på en bokstav
-                if (activeLetter === letter) {
-                    activeLetter = null; // Klicka igen för att avmarkera
-                } else {
-                    activeLetter = letter;
-                }
+                searchInput.value = '';
+                activeCollection = null; // Slå av Top 100 om man väljer en bokstav
+                activeLetter = activeLetter === letter ? null : letter;
                 filterAndSearch();
             });
             alphabetMenu.appendChild(btn);
         });
+
+        // 3. TOP 100-knapp (Sist i raden)
+        const topBtn = document.createElement('button');
+        topBtn.textContent = "⭐ TOP 100";
+        topBtn.className = 'top100-btn';
+        if (activeCollection === "Top 100") topBtn.className += ' active';
+        
+        // Kolla om det ens finns några Top 100-låtar i JSON
+        const hasTop100 = allSongs.some(song => song.collection === "Top 100");
+        if (!hasTop100) topBtn.disabled = true;
+
+        topBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            activeLetter = null; // Slå av bokstavsfilter om man väljer Top 100
+            activeCollection = activeCollection === "Top 100" ? null : "Top 100";
+            filterAndSearch();
+        });
+        alphabetMenu.appendChild(topBtn);
     }
 
-    // 4. Kombinerad sök- och bokstavsfiltrering
     function filterAndSearch() {
         const searchTerm = searchInput.value.toLowerCase().trim();
         
         currentSongs = allSongs.filter(song => {
-            // Kolla bokstavsfiltrering (kollar den kolumn som är aktivt sorterad just nu)
+            // Filtrera på samling (Top 100)
+            if (activeCollection) {
+                if (song.collection !== activeCollection) return false;
+            }
+            // Filtrera på bokstav
             if (activeLetter) {
                 const targetValue = song[currentSort.column];
-                if (!targetValue || targetValue.charAt(0).toUpperCase() !== activeLetter) {
-                    return false;
-                }
+                if (!targetValue || targetValue.charAt(0).toUpperCase() !== activeLetter) return false;
             }
-            // Kolla sökfält
+            // Filtrera på sökord
             if (searchTerm) {
                 return song.title.toLowerCase().includes(searchTerm) || 
                        song.artist.toLowerCase().includes(searchTerm);
@@ -194,7 +200,6 @@
             return true;
         });
 
-        // Håll kvar sorteringsordningen
         const col = currentSort.column;
         currentSongs.sort((a, b) => {
             const valA = a[col].toLowerCase();
@@ -202,17 +207,16 @@
             return currentSort.asc ? valA.localeCompare(valB, 'sv') : valB.localeCompare(valA, 'sv');
         });
 
-        buildAlphabetMenu(); // Bygg om menyn så aktiva knappar lyser rätt
+        buildAlphabetMenu(); 
         renderTable(currentSongs);
     }
 
-    // Lyssna på sökfältet
     searchInput.addEventListener('input', () => {
-        activeLetter = null; // Nollställ bokstavsval om man börjar skriva i fritextsöket
+        activeLetter = null;
+        activeCollection = null; // Nollställ filter när man söker fritt
         filterAndSearch();
     });
 
-    // 5. Hämta datan från songs.json när sidan startar
     fetch('songs.json')
         .then(response => {
             if (!response.ok) throw new Error(`Hittade inte <code>songs.json</code>.`);
@@ -220,11 +224,11 @@
         })
         .then(data => {
             allSongs = data.map(song => ({
-                title: (song.title || song.Title || song.Låttitel || song.låttitel || song.Låt || "").trim(),
-                artist: (song.artist || song.Artist || song.Grupp || "").trim()
+                title: (song.title || song.Title || song.Låttitel || "").trim(),
+                artist: (song.artist || song.Artist || song.Grupp || "").trim(),
+                collection: (song.collection || song.Collection || "").trim() // Läser in nya fältet
             }));
 
-            // Första standardsortering (Låttitel A-Ö)
             allSongs.sort((a, b) => a.title.localeCompare(b.title, 'sv'));
             currentSongs = [...allSongs];
 
@@ -232,13 +236,5 @@
             renderTable(currentSongs);
         })
         .catch(error => {
-            if (error.name === "SyntaxError") {
-                showError("Fel i din songs.json-fil!", "Det finns ett teckenfel i din JSON-kod. Kontrollera kommatecken och citattecken.");
-            } else {
-                showError("Ett fel uppstod:", error.message);
-            }
+            showError("Ett fel uppstod:", error.message);
         });
-</script>
-
-</body>
-</html>
