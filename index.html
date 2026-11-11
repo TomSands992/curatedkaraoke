@@ -5,26 +5,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Karaokelista</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        /* Tvingar alla element att hålla sig inom sin tilldelade bredd */
+        * { box-sizing: border-box; }
+
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 10px; background-color: #f4f7f6; color: #333; }
+        
+        /* Säkerställer att huvudboxen aldrig blir bredare än skärmen */
+        .container { max-width: 600px; width: 100%; margin: 0 auto; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow: hidden; }
+        
         h1 { text-align: center; margin-bottom: 20px; font-size: 24px; color: #111; }
         .search { width: 100%; padding: 12px; margin-bottom: 15px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; outline: none; transition: border-color 0.2s; }
         .search:focus { border-color: #007aff; }
         
-        /* Alfabetisk snabbmeny */
         .alphabet-menu { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-bottom: 20px; padding: 10px; background: #fafafa; border-radius: 8px; border: 1px solid #eee; }
         .alphabet-menu button { background: white; border: 1px solid #ddd; border-radius: 4px; padding: 6px 10px; font-size: 14px; font-weight: bold; cursor: pointer; color: #007aff; user-select: none; }
         .alphabet-menu button:hover { background: #007aff; color: white; border-color: #007aff; }
         .alphabet-menu button:disabled { background: #eee; color: #aaa; border-color: #ddd; cursor: not-allowed; }
         .alphabet-menu button.active { background: #34c759; color: white; border-color: #34c759; }
         
-        /* Särskild stil för Top 100-knappen */
         .alphabet-menu button.top100-btn { color: #ff9500; border-color: #ff9500; }
         .alphabet-menu button.top100-btn:hover { background: #ff9500; color: white; }
         .alphabet-menu button.top100-btn.active { background: #ff9500; color: white; border-color: #ff9500; }
 
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        /* FIX: Tvingar tabellen att hålla sig inom skärmen och fördela kolumnerna 50/50 */
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        
+        /* FIX: Gör att långa ord och namn radbryts istället för att trycka ut bredden */
+        th, td { padding: 12px 8px; text-align: left; border-bottom: 1px solid #eee; word-wrap: break-word; overflow-wrap: break-word; }
+        
+        /* Ger kolumnerna exakt hälften av utrymmet var */
+        th:nth-child(1), td:nth-child(1) { width: 50%; }
+        th:nth-child(2), td:nth-child(2) { width: 50%; }
         
         th { background-color: #fafafa; cursor: pointer; font-weight: 600; user-select: none; position: relative; }
         th.sort-asc::after { content: ' ↑'; color: #007aff; }
